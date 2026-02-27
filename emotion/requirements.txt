@@ -1,6 +1,7 @@
 # pip install -r requirements.txt
 
 # base ----------------------------------------
+streamlit>=1.28.0
 matplotlib>=3.2.2
 numpy>=1.18.5
 opencv-python-headless==4.10.0.84
