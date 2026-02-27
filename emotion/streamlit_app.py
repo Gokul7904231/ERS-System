@@ -16,10 +16,10 @@ from pathlib import Path
 from datetime import datetime
 
 # Import the emotion detection modules
-from emotion import detect_emotion, init
+from emotion.emotion_detector import detect_emotion, init
 from emotion.models.experimental import attempt_load
 from emotion.utils.datasets import LoadImages
-from emotion.utils.general import check_img_size, non_max_suppression, scale_coords, create_folder
+from emotion.utils.general import check_img_size, non_max_suppression, scale_coords
 from emotion.utils.plots import plot_one_box
 from emotion.utils.torch_utils import select_device, time_synchronized
 
