@@ -16,13 +16,12 @@ from pathlib import Path
 from datetime import datetime
 
 # Import the emotion detection modules
-from emotion.emotion_detector import detect_emotion, init
+from emotion_detector import detect_emotion, init
 from emotion.models.experimental import attempt_load
 from emotion.utils.datasets import LoadImages
 from emotion.utils.general import check_img_size, non_max_suppression, scale_coords
 from emotion.utils.plots import plot_one_box
 from emotion.utils.torch_utils import select_device, time_synchronized
-
 # Import music recommendation modules
 from music_recommender import music_recommender
 from music_player import (display_music_recommendations, display_playlist_summary, create_music_player_sidebar, 
@@ -122,7 +121,9 @@ def load_models():
             init(device)
             
             # Load face detection model
-            face_model = attempt_load("weights/yolov7-tiny.pt", map_location=device)
+            BASE_DIR = Path(__file__).resolve().parent
+            weights_path = BASE_DIR / "weights" / "yolov7-tiny.pt"
+            face_model = attempt_load(str(weights_path), map_location=device)
             stride = int(face_model.stride.max())
             imgsz = check_img_size(512, s=stride)
             
