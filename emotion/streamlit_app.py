@@ -17,11 +17,11 @@ from datetime import datetime
 
 # Import the emotion detection modules
 from emotion import detect_emotion, init
-from models.experimental import attempt_load
-from utils.datasets import LoadImages
-from utils.general import check_img_size, non_max_suppression, scale_coords, create_folder
-from utils.plots import plot_one_box
-from utils.torch_utils import select_device, time_synchronized
+from emotion.models.experimental import attempt_load
+from emotion.utils.datasets import LoadImages
+from emotion.utils.general import check_img_size, non_max_suppression, scale_coords, create_folder
+from emotion.utils.plots import plot_one_box
+from emotion.utils.torch_utils import select_device, time_synchronized
 
 # Import music recommendation modules
 from music_recommender import music_recommender
