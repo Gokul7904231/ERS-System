@@ -9,11 +9,16 @@ venv/
 env.yaml
 
 # ML models & weights
-models/
-weights/
+models/*
+!models/*.pt
+!models/*.pth
+
+weights/*
+!weights/*.pt
+!weights/*.pth
+
 *.h5
 *.pkl
-*.pt
 *.joblib
 
 # Data files
