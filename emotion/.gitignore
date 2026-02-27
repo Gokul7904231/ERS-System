@@ -1,0 +1,30 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+env/
+venv/
+.venv/
+env.yaml
+
+# ML models & weights
+models/
+weights/
+*.h5
+*.pkl
+*.pt
+*.joblib
+
+# Data files
+data/
+datasets/
+*.csv
+*.zip
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+.DS_Store
