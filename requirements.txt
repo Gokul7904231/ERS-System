@@ -9,4 +9,4 @@ altair
 matplotlib
 scipy
 tqdm
-PyYAML
+PyYAML==6.0.1
