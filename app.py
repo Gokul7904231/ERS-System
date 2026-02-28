@@ -1,50 +1,94 @@
+import sys
+import os
+
+ROOT = os.path.abspath(os.path.dirname(__file__))
+sys.path.append(ROOT)
+sys.path.append(os.path.join(ROOT, "emotion"))
+
+import emotion.models as models
+sys.modules['models'] = models
 import streamlit as st
 import cv2
 import numpy as np
 import torch
-import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 from PIL import Image
 import time
 import os
 import tempfile
-import base64
 from io import BytesIO
 import pandas as pd
 import altair as alt
 from pathlib import Path
 from datetime import datetime
 
-# Import the emotion detection modules
-from emotion_detector import detect_emotion, init
+# ===============================
+# Emotion Detection Modules
+# ===============================
+from emotion.emotion_detector import detect_emotion, init
 from emotion.models.experimental import attempt_load
 from emotion.utils.datasets import LoadImages
 from emotion.utils.general import check_img_size, non_max_suppression, scale_coords
 from emotion.utils.plots import plot_one_box
 from emotion.utils.torch_utils import select_device, time_synchronized
-# Import music recommendation modules
-from music_recommender import music_recommender
-from music_player import (display_music_recommendations, display_playlist_summary, create_music_player_sidebar, 
-                        play_track, display_enhanced_music_recommendations, display_youtube_player, display_enhanced_youtube_player)
-from enhanced_ui import (apply_enhanced_styling, create_enhanced_header, create_soothing_navigation,
-                        create_soothing_section, create_enhanced_footer)
-from compact_sidebar import create_compact_sidebar
-from resources_section import create_resources_section
-from professional_music_player import (create_professional_music_section, create_emotion_based_playlist,
-                                     create_current_player, create_music_insights, create_quick_play_section)
 
-# Import reading recommendation modules
-from reading_recommender import reading_recommender
-from reading_display import display_reading_recommendations, display_quick_reading_links, display_reading_insights, create_reading_sidebar
+# ===============================
+# Music Modules
+# ===============================
+from emotion.music_recommender import music_recommender
+from emotion.music_player import (
+    display_music_recommendations,
+    display_playlist_summary,
+    create_music_player_sidebar,
+    play_track,
+    display_enhanced_music_recommendations,
+    display_youtube_player,
+    display_enhanced_youtube_player,
+    display_mood_journey_playlist
+)
+from emotion.enhanced_ui import (
+    apply_enhanced_styling,
+    create_enhanced_header,
+    create_soothing_navigation,
+    create_soothing_section,
+    create_enhanced_footer
+)
+from emotion.compact_sidebar import create_compact_sidebar
+from emotion.resources_section import create_resources_section
+from emotion.professional_music_player import (
+    create_professional_music_section,
+    create_emotion_based_playlist,
+    create_current_player,
+    create_music_insights,
+    create_quick_play_section
+)
 
-# Import wellness modules
-from wellness_features import wellness_features
-from breathing_exercises import display_breathing_exercise
+# ===============================
+# Reading Modules
+# ===============================
+from emotion.reading_recommender import reading_recommender
+from emotion.reading_display import (
+    display_reading_recommendations,
+    display_quick_reading_links,
+    display_reading_insights,
+    create_reading_sidebar
+)
 
-# Import mental health resources
-from mental_health_resources import mental_health_resources
-from mental_health_display import display_mental_health_resources, display_quick_mental_health_links, create_mental_health_sidebar
+# ===============================
+# Wellness Modules
+# ===============================
+from emotion.wellness_features import wellness_features
+from emotion.breathing_exercises import display_breathing_exercise
 
+# ===============================
+# Mental Health Modules
+# ===============================
+from emotion.mental_health_resources import mental_health_resources
+from emotion.mental_health_display import (
+    display_mental_health_resources,
+    display_quick_mental_health_links,
+    create_mental_health_sidebar
+)
 # Page configuration
 st.set_page_config(
     page_title="🧠 MOOD DRIVEN PERSONALIZED RECOMENDATION SYSTEM",
@@ -113,8 +157,14 @@ def load_models():
     """Load YOLOv7 face detection and RepVGG emotion classification models"""
     try:
         with st.spinner("Loading models..."):
-            # Initialize device
+            # Initialize device (prefer CPU in cloud)
             device = select_device('')
+            if device.type != 'cpu':
+                # fallback to cpu if no cuda available or on limited env
+                try:
+                    _ = torch.zeros(1).to(device)
+                except Exception:
+                    device = select_device('cpu')
             st.session_state.device = device
             
             # Initialize emotion model
@@ -122,14 +172,24 @@ def load_models():
             
             # Load face detection model
             BASE_DIR = Path(__file__).resolve().parent
-            weights_path = BASE_DIR / "weights" / "yolov7-tiny.pt"
-            face_model = attempt_load(str(weights_path), map_location=device)
+            weights_path = BASE_DIR / "emotion" / "weights" / "yolov7-tiny.pt"
+            if not weights_path.exists():
+                st.error(f"Face detection weights missing: {weights_path}")
+                return False
+            try:
+                face_model = attempt_load(str(weights_path), map_location=device)
+            except Exception as e:
+                st.error(f"Error loading face model: {e}")
+                return False
             stride = int(face_model.stride.max())
             imgsz = check_img_size(512, s=stride)
             
             if device.type != 'cpu':
                 face_model.half()  # to FP16
-                face_model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(face_model.parameters())))
+                try:
+                    face_model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(face_model.parameters())))
+                except Exception:
+                    pass
             
             st.session_state.face_model = face_model
             st.session_state.models_loaded = True
@@ -143,79 +203,58 @@ def detect_faces_and_emotions(image, conf_thres=0.5, iou_thres=0.45):
     """Detect faces and classify emotions in an image"""
     if not st.session_state.models_loaded:
         return None, "Models not loaded"
-    
+
     try:
         device = st.session_state.device
         face_model = st.session_state.face_model
-        
-        # Convert PIL to numpy array if needed
+
+        # convert PIL -> numpy
         if isinstance(image, Image.Image):
             image = np.array(image)
-        
-        # Ensure image is in RGB format
-        if len(image.shape) == 3 and image.shape[2] == 3:
-            # If image is BGR, convert to RGB
+
+        # ensure RGB
+        if image.ndim == 3 and image.shape[2] == 3:
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         else:
             image_rgb = image
-        
-        # Prepare image for YOLO (following the original main.py format)
+
+        # prepare tensor
         img_size = 512
-        img = cv2.resize(image_rgb, (img_size, img_size))
-        
-        # Convert to tensor and normalize properly
-        img = torch.from_numpy(img).to(device)
+        img0 = cv2.resize(image_rgb, (img_size, img_size))
+        img = torch.from_numpy(img0).to(device)
         img = img.half() if device.type != 'cpu' else img.float()
-        img /= 255.0  # Normalize to 0-1 range
-        
-        # Ensure correct tensor shape: [batch, channels, height, width]
+        img /= 255.0
         if img.ndimension() == 3:
-            img = img.permute(2, 0, 1).unsqueeze(0)  # HWC -> CHW -> BCHW
-        
-        # Face detection inference
+            img = img.permute(2, 0, 1).unsqueeze(0)
+
         with torch.no_grad():
             pred = face_model(img)[0]
             pred = non_max_suppression(pred, conf_thres, iou_thres)
-        
-        # Process detections
+
         results = []
-        face_images = []
-        
+        face_crops, boxes, confidences = [], [], []
+
         for det in pred:
-            if len(det):
-                # Rescale boxes from img_size to original size
+            if det is not None and len(det):
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], image_rgb.shape).round()
-                
                 for *xyxy, conf, cls in det:
-                    x1, y1, x2, y2 = int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])
-                    
-                    # Extract face region
-                    face_crop = image_rgb[y1:y2, x1:x2]
-                    if face_crop.size > 0:
-                        face_images.append(face_crop)
-        
-        # Classify emotions if faces detected
-        if face_images:
-            emotions = detect_emotion(face_images, conf=True)
-            
-            # Combine face detections with emotions
-            for det in pred:
-                if len(det):
-                    for j, (*xyxy, conf, cls) in enumerate(det):
-                        if j < len(emotions):
-                            emotion_info = emotions[j][0]
-                            emotion_name = emotion_info.split(' (')[0]
-                            confidence = float(emotion_info.split('(')[1].split('%')[0]) if '(' in emotion_info else 100.0
-                            
-                            results.append({
-                                'bbox': [int(xyxy[0]), int(xyxy[1]), int(xyxy[2]), int(xyxy[3])],
-                                'emotion': emotion_name,
-                                'confidence': confidence,
-                                'face_conf': float(conf)
-                            })
-        
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    boxes.append((x1, y1, x2, y2))
+                    confidences.append(conf.item())
+                    crop = image_rgb[y1:y2, x1:x2]
+                    if crop.size:
+                        face_crops.append(crop)
+
+        emotions = detect_emotion(face_crops, conf=True) if face_crops else []
+
+        for i, box in enumerate(boxes):
+            results.append({
+                'bbox': box,
+                'emotion': emotions[i][0] if i < len(emotions) else '',
+                'confidence': confidences[i]
+            })
+
         return results, None
-        
     except Exception as e:
         return None, str(e)
 
@@ -706,7 +745,7 @@ def main():
                     st.session_state.playlist = playlist
                     
                     # Display enhanced playlist with emotional flow visualization
-                    from music_player import display_mood_journey_playlist
+                    from emotion.music_player import display_mood_journey_playlist
                     display_mood_journey_playlist(playlist, emotion_summary)
                     
                     # Display simple player if a track is selected
@@ -1518,7 +1557,7 @@ def analyze_webcam_emotions():
             st.session_state.playlist = playlist
             
             # Display enhanced playlist
-            from music_player import display_mood_journey_playlist
+            from emotion.music_player import display_mood_journey_playlist
             display_mood_journey_playlist(playlist, f"Emotional Journey ({total_frames} frames)")
             
             # Professional emotion-based playlist

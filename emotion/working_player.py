@@ -63,7 +63,7 @@ def display_working_youtube_player(track: Dict):
     with col1:
         if st.button("⏮️ Previous", use_container_width=True):
             # Import play_previous_track from music_player
-            from music_player import play_previous_track
+            from emotion.music_player import play_previous_track
             play_previous_track()
     
     with col2:
@@ -75,7 +75,7 @@ def display_working_youtube_player(track: Dict):
     with col3:
         if st.button("⏭️ Next", use_container_width=True):
             # Import play_next_track from music_player
-            from music_player import play_next_track
+            from emotion.music_player import play_next_track
             play_next_track()
     
     # Additional fallback options
@@ -119,7 +119,7 @@ def display_simple_working_player(track: Dict):
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("⏮️ Previous"):
-            from music_player import play_previous_track
+            from emotion.music_player import play_previous_track
             play_previous_track()
     with col2:
         if st.button("⏸️ Stop"):
@@ -128,5 +128,5 @@ def display_simple_working_player(track: Dict):
             st.rerun()
     with col3:
         if st.button("⏭️ Next"):
-            from music_player import play_next_track
+            from emotion.music_player import play_next_track
             play_next_track()

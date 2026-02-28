@@ -1,33 +1,13 @@
 """
 AI MoodMate - Music Recommendation System
-Suggests music based on detected emotions using Spotify API and YouTube integration
+Suggests music based on detected emotions using a YouTube-based recommendation system
 """
 
-import spotipy
-from spotipy.oauth2 import SpotifyClientCredentials
-import requests
-import json
 import random
 from typing import List, Dict, Tuple
 
 class MusicRecommender:
     def __init__(self):
-        # Spotify API credentials (you'll need to get these from Spotify Developer Dashboard)
-        self.client_id = "your_spotify_client_id"  # Replace with your actual client ID
-        self.client_secret = "your_spotify_client_secret"  # Replace with your actual client secret
-        
-        # Initialize Spotify client
-        try:
-            client_credentials_manager = SpotifyClientCredentials(
-                client_id=self.client_id,
-                client_secret=self.client_secret
-            )
-            self.sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
-            self.spotify_available = True
-        except Exception as e:
-            print(f"Spotify API not available: {e}")
-            self.spotify_available = False
-        
         # Enhanced emotion to music mapping with detailed metadata
         self.emotion_music_mapping = {
             "happy": {
@@ -144,7 +124,7 @@ class MusicRecommender:
             }
         }
         
-        # Curated playlists for each emotion (fallback when Spotify API is not available)
+        # YouTube-based playlists for each emotion
         self.curated_playlists = {
             "happy": [
                 {"title": "Happy - Pharrell Williams", "artist": "Pharrell Williams", "youtube_id": "ZbZSe6N_BXs"},
@@ -206,12 +186,10 @@ class MusicRecommender:
     
     def get_music_recommendations(self, emotion: str, count: int = 5) -> List[Dict]:
         """
-        Get music recommendations for a specific emotion
-        
+        Get music recommendations for a specific emotion (YouTube-based only)
         Args:
             emotion: The detected emotion
             count: Number of recommendations to return
-            
         Returns:
             List of music recommendations with title, artist, and YouTube ID
         """
@@ -219,57 +197,21 @@ class MusicRecommender:
         emotion = emotion.lower()
         if emotion == "angry":
             emotion = "anger"
-        
         if emotion not in self.emotion_music_mapping:
             emotion = "neutral"
-        
-        if self.spotify_available:
-            return self._get_spotify_recommendations(emotion, count)
-        else:
-            return self._get_curated_recommendations(emotion, count)
+        return self._get_curated_recommendations(emotion, count)
     
-    def _get_spotify_recommendations(self, emotion: str, count: int) -> List[Dict]:
-        """Get recommendations from Spotify API"""
-        try:
-            emotion_data = self.emotion_music_mapping[emotion]
-            
-            # Search for tracks based on emotion keywords
-            recommendations = []
-            for keyword in emotion_data["keywords"][:3]:  # Use top 3 keywords
-                results = self.sp.search(q=keyword, type='track', limit=count)
-                
-                for track in results['tracks']['items']:
-                    if len(recommendations) >= count:
-                        break
-                    
-                    # Extract YouTube ID (this is a simplified approach)
-                    youtube_id = self._get_youtube_id(track['name'], track['artists'][0]['name'])
-                    
-                    recommendations.append({
-                        'title': track['name'],
-                        'artist': track['artists'][0]['name'],
-                        'youtube_id': youtube_id,
-                        'spotify_url': track['external_urls']['spotify'],
-                        'preview_url': track['preview_url'],
-                        'album_cover': track['album']['images'][0]['url'] if track['album']['images'] else None
-                    })
-            
-            return recommendations[:count]
-            
-        except Exception as e:
-            print(f"Spotify API error: {e}")
-            return self._get_curated_recommendations(emotion, count)
+    # Spotify-based recommendation method removed
     
     def _get_curated_recommendations(self, emotion: str, count: int) -> List[Dict]:
-        """Get curated recommendations when Spotify API is not available"""
+        """Get YouTube-based recommendations for the given emotion"""
         playlist = self.curated_playlists.get(emotion, self.curated_playlists["neutral"])
         return random.sample(playlist, min(count, len(playlist)))
     
     def _get_youtube_id(self, title: str, artist: str) -> str:
-        """Get YouTube video ID for a track (simplified implementation)"""
-        # This is a placeholder - in a real implementation, you'd use YouTube Data API
-        # For now, we'll use a default video ID
-        return "dQw4w9WgXcQ"  # Rick Roll as fallback
+        """Get YouTube video ID for a track (not used in YouTube-only mode)"""
+        # Not used in YouTube-only mode, kept for compatibility
+        return "dQw4w9WgXcQ"
     
     def get_playlist_for_video_analysis(self, emotion_results: Dict[str, float], count_per_emotion: int = 3) -> List[Dict]:
         """

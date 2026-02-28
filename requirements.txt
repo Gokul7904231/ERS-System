@@ -1,0 +1,11 @@
+streamlit==1.49.1
+torch==2.2.2
+torchvision==0.17.2
+numpy
+opencv-python-headless
+Pillow
+pandas
+altair
+matplotlib
+scipy
+tqdm

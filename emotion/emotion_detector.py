@@ -1,9 +1,10 @@
 import torch
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
+from pathlib import Path
 
 from PIL import Image
-from repvgg import create_RepVGG_A0 as create
+from emotion.repvgg import create_RepVGG_A0 as create
 
 # Load model
 model = create(deploy=True)
@@ -16,7 +17,16 @@ def init(device):
     global dev
     dev = device
     model.to(device)
-    model.load_state_dict(torch.load("weights/repvgg.pth", weights_only=False))
+    # load weights from package-relative path
+    weights_path = Path(__file__).resolve().parent / "weights" / "repvgg.pth"
+    try:
+        if not weights_path.exists():
+            raise FileNotFoundError(f"RepVGG weights not found at {weights_path}")
+        state = torch.load(str(weights_path), map_location=device, weights_only=False)
+        model.load_state_dict(state)
+    except Exception as e:
+        # log error and continue with uninitialized weights (random)
+        print(f"Warning: could not load emotion model weights: {e}")
 
     # Save to eval
     cudnn.benchmark = True

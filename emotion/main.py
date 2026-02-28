@@ -8,14 +8,14 @@ import torch.backends.cudnn as cudnn
 import torch
 import cv2
 
-from emotion import detect_emotion, init
+from emotion.emotion_detector import detect_emotion, init
 
-from models.experimental import attempt_load
-from utils.datasets import LoadStreams, LoadImages
-from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, \
+from emotion.models.experimental import attempt_load
+from emotion.utils.datasets import LoadStreams, LoadImages
+from emotion.utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, \
     scale_coords, set_logging, create_folder
-from utils.plots import plot_one_box
-from utils.torch_utils import select_device, time_synchronized
+from emotion.utils.plots import plot_one_box
+from emotion.utils.torch_utils import select_device, time_synchronized
 
 
 def detect(opt):
@@ -32,7 +32,11 @@ def detect(opt):
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Load model
-    model = attempt_load("weights/yolov7-tiny.pt", map_location=device)  # load FP32 model
+    # load face detector weights from package path
+    weights_file = Path(__file__).resolve().parent / "weights" / "yolov7-tiny.pt"
+    if not weights_file.exists():
+        raise FileNotFoundError(f"Face weights not found: {weights_file}")
+    model = attempt_load(str(weights_file), map_location=device)  # load FP32 model
     stride = int(model.stride.max())  # model stride
     imgsz = check_img_size(imgsz, s=stride)  # check img_size
     if half:
@@ -55,7 +59,13 @@ def detect(opt):
     if device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
     t0 = time.time()
+    frame_count = 0
+    max_frames = 10000  # safety limit
     for path, img, im0s, vid_cap in dataset:
+        frame_count += 1
+        if frame_count > max_frames:
+            print('Max frame limit reached, exiting loop')
+            break
         img = torch.from_numpy(img).to(device)
         img = img.half() if half else img.float()  # uint8 to fp16/32
         img /= 255.0  # 0 - 255 to 0.0 - 1.0
@@ -117,11 +127,11 @@ def detect(opt):
                         plot_one_box(xyxy, im0, label=label, color=colour, line_thickness=opt.line_thickness)
 
 
-            # Stream results
-            if view_img:
-                display_img = cv2.resize(im0, (im0.shape[1]*2,im0.shape[0]*2))
-                cv2.imshow("Emotion Detection",display_img)
-                cv2.waitKey(1)  # 1 millisecond
+            # Stream results - no GUI display in headless mode
+            # if view_img:  # display not supported on headless environments
+            #     display_img = cv2.resize(im0, (im0.shape[1]*2,im0.shape[0]*2))
+            #     cv2.imshow("Emotion Detection",display_img)
+            #     cv2.waitKey(1)  # 1 millisecond
             if not nosave:
                 # check what the output format is
                 ext = save_path.split(".")[-1]
