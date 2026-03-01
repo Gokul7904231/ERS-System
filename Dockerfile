@@ -2,18 +2,20 @@ FROM python:3.11
 
 WORKDIR /app
 
-# Install git + git-lfs
-RUN apt-get update && apt-get install -y git git-lfs
-RUN git lfs install
-RUN wget -O emotion/weights/yolov7-tiny.pt ...
+RUN apt-get update && apt-get install -y git git-lfs wget
 
+# Copy project first
 COPY . .
 
-# Pull LFS files AFTER copying repo
-RUN git lfs pull
+# Create weights folder BEFORE downloading
+RUN mkdir -p emotion/weights
+
+# Download weights
+RUN wget -O emotion/weights/yolov7-tiny.pt https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7-tiny.pt
 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
+EXPOSE 7860
 
 CMD ["streamlit", "run", "app.py", "--server.port=7860", "--server.address=0.0.0.0"]
