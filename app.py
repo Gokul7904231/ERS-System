@@ -1,13 +1,9 @@
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-ROOT = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(ROOT)
-sys.path.append(os.path.join(ROOT, "emotion"))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(BASE_DIR, "emotion"))
 
-import emotion.models as models
-sys.modules['models'] = models
 import streamlit as st
 import cv2
 import numpy as np
@@ -27,7 +23,7 @@ from datetime import datetime
 # Emotion Detection Modules
 # ===============================
 from emotion.emotion_detector import detect_emotion, init
-from emotion.models.experimental import attempt_load
+from models.experimental import attempt_load
 from emotion.utils.datasets import LoadImages
 from emotion.utils.general import check_img_size, non_max_suppression, scale_coords
 from emotion.utils.plots import plot_one_box
