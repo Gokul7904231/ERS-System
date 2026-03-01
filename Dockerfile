@@ -5,6 +5,7 @@ WORKDIR /app
 # Install git + git-lfs
 RUN apt-get update && apt-get install -y git git-lfs
 RUN git lfs install
+RUN wget -O emotion/weights/yolov7-tiny.pt ...
 
 COPY . .
 
