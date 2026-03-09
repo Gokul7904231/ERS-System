@@ -195,7 +195,7 @@ def main():
     SAVE_PATH = PROJECT_ROOT / "models" / "weights" / "efficientnet_emotion.pth"
     SAVE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    BATCH_SIZE = 32
+    BATCH_SIZE = 4
     NUM_EPOCHS = 30
     LR = 1e-4
     WEIGHT_DECAY = 1e-4
