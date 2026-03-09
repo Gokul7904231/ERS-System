@@ -2,22 +2,27 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchvision.transforms as transforms
 from pathlib import Path
-import streamlit as st # Import streamlit for st.error
+import streamlit as st
 
 from PIL import Image
-from src.core.repvgg import create_RepVGG_A0 as create # Updated import
+from src.core.repvgg import create_RepVGG_A0 as create
 
-# Load model
-model = create(deploy=True)
+# Lazy-loaded model — NOT created at import time
+_model = None
+_device = None
 
 # 8 Emotions
 emotions = ("anger","contempt","disgust","fear","happy","neutral","sad","surprise")
 
 def init(device):
-    # Initialise model
-    global dev
-    dev = device
-    model.to(device)
+    """Initialize the RepVGG emotion model (lazy — only creates model on first call)."""
+    global _model, _device
+    _device = device
+
+    if _model is None:
+        _model = create(deploy=True)
+
+    _model.to(device)
     # load weights from package-relative path
     # Updated weights_path
     weights_path = Path(__file__).resolve().parent.parent.parent / "models" / "weights" / "repvgg.pth"
@@ -28,7 +33,7 @@ def init(device):
             # Or, set a flag so that `detect_emotion` can return an error
             raise FileNotFoundError(f"RepVGG weights not found at {weights_path}")
         state = torch.load(str(weights_path), map_location=device, weights_only=False)
-        model.load_state_dict(state)
+        _model.load_state_dict(state)
         print(f"RepVGG weights loaded from {weights_path}") # Confirmation
     except FileNotFoundError as fnfe:
         # Re-raise the specific FileNotFoundError to ensure it's handled upstream if necessary
@@ -40,9 +45,11 @@ def init(device):
 
     # Save to eval
     cudnn.benchmark = True
-    model.eval()
+    _model.eval()
 
-def detect_emotion(images, device, conf=True):
+def detect_emotion(images, device=None, conf=True):
+    """Detect emotions from a list of face crop images using RepVGG model."""
+    used_device = device if device is not None else _device
     with torch.no_grad():
         # Normalise and transform images
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -54,19 +61,10 @@ def detect_emotion(images, device, conf=True):
                 normalize,
             ])(Image.fromarray(image)) for image in images])
         # Feed through the model
-        y = model(x.to(device))
+        y = _model(x.to(used_device))
         result = []
         for i in range(y.size()[0]):
-            # Get the predicted class index
             max_val, predicted_idx = y[i].max(0)
             emotion_idx = predicted_idx.item()
-            
-            # Safety check: ensure emotion index is within valid range (0-7 for 8 emotions)
-            # The RepVGG model outputs 1000 classes, but we only have 8 emotions
-            if emotion_idx >= len(emotions):
-                # Map out-of-range indices to a valid emotion using modulo
-                emotion_idx = emotion_idx % len(emotions)
-            
-            # Add emotion to result
             result.append([emotions[emotion_idx], y[i][emotion_idx].item() * 100])
     return result

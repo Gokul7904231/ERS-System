@@ -1,10 +1,13 @@
 import streamlit as st
 from datetime import datetime
 import json
+import pandas as pd
+import io
 
 from src.features.wellness_features import wellness_features
 
 
+@st.fragment
 def display_mood_journal(emotion, wellness_features):
     """Display mood journaling interface based on detected emotion."""
     
@@ -33,12 +36,14 @@ def display_mood_journal(emotion, wellness_features):
         
         journal_responses = {}
         for i, prompt in enumerate(prompts):
-            journal_responses[f"prompt_{i}"] = st.text_area(
+            # Store with the prompt as key to show questions later
+            response = st.text_area(
                 prompt, 
                 key=f"journal_prompt_{emotion}_{i}",
                 height=80,
                 placeholder="Share your thoughts here..."
             )
+            journal_responses[prompt] = response
         
         # Additional free-form journaling
         st.markdown("#### ✍️ Additional Thoughts")
@@ -114,9 +119,11 @@ def display_mood_journal(emotion, wellness_features):
                     st.markdown(f"**Tags:** {', '.join(entry['mood_tags'])}")
                 
                 st.markdown("**Responses:**")
-                for key, response in entry['responses'].items():
+                for prompt, response in entry['responses'].items():
                     if response:
-                        st.markdown(f"- {response}")
+                        st.markdown(f"**Q:** *{prompt}*")
+                        st.markdown(f"**A:** {response}")
+                        st.markdown("")
                 
                 if entry['additional_thoughts']:
                     st.markdown("**Additional Thoughts:**")
@@ -127,23 +134,79 @@ def display_mood_journal(emotion, wellness_features):
         with col1:
             if st.button("🗑️ Clear All", key="clear_journal"):
                 st.session_state.journal_entries = []
-                st.rerun()
+                st.rerun(scope="fragment")
         with col2:
             # Export button
             if st.button("📥 Export Data", key="export_journal"):
+                # Prepare metadata for exports
                 export_data = {
                     "export_date": datetime.now().isoformat(),
                     "total_entries": len(st.session_state.journal_entries),
                     "entries": st.session_state.journal_entries
                 }
+                
+                # JSON Download
                 json_data = json.dumps(export_data, indent=2)
                 st.download_button(
-                    label="💾 Download JSON",
+                    label="📥 Download JSON",
                     data=json_data,
                     file_name=f"mood_journal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
                     mime="application/json",
-                    key="download_journal"
+                    key="download_json"
                 )
+                
+                # Excel Download
+                try:
+                    # Flatten the data for Excel
+                    flattened_entries = []
+                    for entry in st.session_state.journal_entries:
+                        # Combine tags into a string
+                        tags_str = ", ".join(entry['mood_tags']) if entry['mood_tags'] else ""
+                        
+                        # Combine all Q&A into one summary string for readability, 
+                        # but also keep them separate if possible
+                        q_a_list = []
+                        for q, a in entry['responses'].items():
+                            if a:
+                                q_a_list.append(f"Q: {q}\nA: {a}")
+                        q_a_str = "\n\n".join(q_a_list)
+                        
+                        row = {
+                            "Timestamp": datetime.fromisoformat(entry['timestamp']).strftime('%Y-%m-%d %H:%M:%S'),
+                            "Emotion": entry['emotion'].title(),
+                            "Intensity": entry['intensity'],
+                            "Tags": tags_str,
+                            "Questions & Answers": q_a_str,
+                            "Additional Thoughts": entry['additional_thoughts']
+                        }
+                        flattened_entries.append(row)
+                    
+                    df = pd.DataFrame(flattened_entries)
+                    
+                    # Create Excel file in memory
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, index=False, sheet_name='Mood Journal')
+                    
+                    excel_data = output.getvalue()
+                    
+                    st.download_button(
+                        label="📊 Download Excel",
+                        data=excel_data,
+                        file_name=f"mood_journal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download_excel"
+                    )
+                except Exception as e:
+                    # Fallback to CSV if Excel fails
+                    csv = df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📄 Download CSV (Excel Compatible)",
+                        data=csv,
+                        file_name=f"mood_journal_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        key="download_csv"
+                    )
 
 
 def display_mood_tracking():

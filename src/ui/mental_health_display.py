@@ -265,8 +265,11 @@ def create_mental_health_sidebar():
     st.markdown("### ⚠️ Important")
     st.markdown("**This app is not a substitute for professional mental health care. If you're in crisis, please reach out for immediate help.**")
 
+@st.fragment
 def show_chatbot(emotion):
-    """Display the wellness chatbot interface based on detected emotion."""
+    """Display the wellness chatbot interface based on detected emotion.
+    Runs as a fragment to prevent the entire page from rerunning on input.
+    """
     import streamlit as st
     from src.features.wellness_chatbot import wellness_chatbot # Updated import
     from src.ui.enhanced_ui import apply_chat_styling
@@ -291,121 +294,50 @@ def show_chatbot(emotion):
     if 'chat_history' not in st.session_state:
         st.session_state.chat_history = []
     
-    # Display chat history with modern chat bubbles
-    st.markdown("#### 💭 Conversation")
-    
-    # Create chat messages container with unique ID for JavaScript targeting
-    chat_html = '<div id="chat-messages-container" class="chat-messages">'
-    
-    for message in st.session_state.chat_history:
-        if message['role'] == 'user':
-            chat_html += f'''
-            <div class="chat-message user">
-                <div class="message-bubble">
-                    <span class="message-label">You</span>
-                    <span class="message-content">{message['content']}</span>
-                </div>
-            </div>'''
-        else:
-            chat_html += f'''
-            <div class="chat-message bot">
-                <div class="message-bubble">
-                    <span class="message-label">🤖 Companion</span>
-                    <span class="message-content">{message['content']}</span>
-                </div>
-            </div>'''
-    
-    chat_html += '</div>'
-    st.markdown(chat_html, unsafe_allow_html=True)
-    
-    # Add JavaScript for automatic scrolling
-    st.markdown("""
-    <script>
-    // Auto-scroll to bottom of chat container when messages change
-    function scrollToBottom() {
-        var chatContainer = document.getElementById('chat-messages-container');
-        if (chatContainer) {
-            chatContainer.scrollTo({
-                top: chatContainer.scrollHeight,
-                behavior: 'smooth'
-            });
-        }
-    }
-    
-    // Run on initial load
-    scrollToBottom();
-    
-    // Set up MutationObserver to detect new messages
-    var chatContainer = document.getElementById('chat-messages-container');
-    if (chatContainer) {
-        var observer = new MutationObserver(function(mutations) {
-            scrollToBottom();
-        });
-        
-        observer.observe(chatContainer, {
-            childList: true,
-            subtree: true
-        });
-    }
-    </script>
-    """, unsafe_allow_html=True)
+    # 1. Layout: Define container first so it appears above the input
+    if not st.session_state.chat_history:
+        # No history: draw a borderless or standard flow container (no scroll view)
+        chat_container = st.container()
+    else:
+        # Has history: frame it with a 400px scrollable view
+        chat_container = st.container(height=400, border=True)
 
-    # Initialize input key if not exists
-    if 'chat_input_key' not in st.session_state:
-        st.session_state.chat_input_key = 0
-    
-    # Use st.text_input directly instead of form to avoid rerun issues
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        user_message = st.text_input(
-            "Type your message:", 
-            key=f"chatbot_input_{st.session_state.chat_input_key}", 
-            placeholder="Type your message here...",
-            label_visibility="collapsed"
-        )
-    with col2:
-        send_button = st.button("Send 💬", type="primary", use_container_width=True)
-    
-    # Clear chat button in a separate column
-    col3, col4 = st.columns([1, 4])
-    with col3:
-        clear_button = st.button("Clear Chat 🗑️", use_container_width=True)
-    
-    # Handle clear chat
-    if clear_button:
-        st.session_state.chat_history = []
-        st.session_state.chat_input_key += 1
-        st.rerun()
-    
-    # Handle message sending - check if there's a pending message
-    if 'pending_message' not in st.session_state:
-        st.session_state.pending_message = None
-    
-    # If user pressed Enter (text_input returns value) or clicked send
-    if send_button and user_message.strip():
-        # Add user message to history
+    # 2. Render input below the container
+    user_message = st.chat_input(
+        "Type your message here...",
+        key=f"chatbot_input_{emotion}",
+    )
+
+    # 3. Process input and update state immediately
+    if user_message:
         st.session_state.chat_history.append({
-            'role': 'user',
-            'content': user_message
+            "role": "user",
+            "content": user_message,
         })
-        
-        # Get bot response - use Gemini if configured, else fallback
-        if wellness_chatbot.model:  # Check if Gemini model is loaded
+
+        if wellness_chatbot.model:
             bot_response = wellness_chatbot.get_gemini_response(user_message, emotion)
         else:
             bot_response = wellness_chatbot.get_supportive_response()
-            
-        # Add bot response to history
+
         st.session_state.chat_history.append({
-            'role': 'bot',
-            'content': bot_response
+            "role": "assistant",
+            "content": bot_response,
         })
-        
-        # Increment key to reset input and clear the value
-        st.session_state.chat_input_key += 1
-        st.rerun()
-    
-    # Show wellness tip with new styling
+
+    # 4. Render the chat history visually inside the container defined above
+    with chat_container:
+        for message in st.session_state.chat_history:
+            avatar = "👤" if message["role"] == "user" else "🌟"
+            with st.chat_message(message["role"], avatar=avatar):
+                st.write(message["content"])
+
+    # Clear chat button
+    if st.button("Clear Chat 🗑️", key="clear_chat_btn"):
+        st.session_state.chat_history = []
+        st.rerun(scope="fragment")
+
+    # Show wellness tip
     st.markdown("---")
     st.markdown("#### 💡 Wellness Tip")
     tip = wellness_chatbot.get_wellness_tip(emotion)
@@ -415,11 +347,12 @@ def show_chatbot(emotion):
         <p>{tip}</p>
     </div>
     ''', unsafe_allow_html=True)
-    
-    # Show coping strategies with new styling
+
+    # Show coping strategies
     with st.expander("🧘 Coping Strategies"):
         strategies = wellness_chatbot.coping_strategies
         st.markdown('<div class="coping-strategies"><ol>', unsafe_allow_html=True)
         for i, strategy in enumerate(strategies, 1):
             st.markdown(f'<li>{strategy}</li>', unsafe_allow_html=True)
         st.markdown('</ol></div>', unsafe_allow_html=True)
+

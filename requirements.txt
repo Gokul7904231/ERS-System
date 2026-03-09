@@ -19,3 +19,5 @@ tqdm>=4.41.0
 scikit-learn
 transformers
 huggingface-hub
+retina-face
+openpyxl

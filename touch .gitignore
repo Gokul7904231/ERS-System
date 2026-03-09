@@ -1,0 +1,21 @@
+# datasets
+fer2013/
+datasets/
+
+# trained models
+models/weights/
+*.pth
+*.pt
+
+# python cache
+__pycache__/
+*.pyc
+
+# virtual environments
+.venv/
+venv/
+env/
+
+# system files
+.DS_Store
+Thumbs.db
